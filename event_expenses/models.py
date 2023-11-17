@@ -17,7 +17,7 @@ from django.contrib.auth.models import User
 
 class Evento(models.Model):
     id = models.AutoField(primary_key=True)
-    nombre = models.CharField(max_length=100)
+    nombre = models.CharField(max_length=100, unique=True)
     descripcion = models.TextField(blank=True)
     tipo_opciones = (
         ('VIAJE', 'VIAJE'),
@@ -26,8 +26,9 @@ class Evento(models.Model):
         ('COMIDA', 'COMIDA'),
         ('OTRO', 'OTRO'),
     )
-    tipo = models.CharField(max_length=10, choices=tipo_opciones)
-    foto = models.CharField(max_length=250) #modificar por un campo que admita imagenes
+    tipo = models.CharField(max_length=100, choices=tipo_opciones)
+    foto = models.CharField(max_length=3100) #modificar por un campo que admita imagenes
+    # En este campo va el dueño del evento
     id_usuario = models.ForeignKey(User, on_delete=models.CASCADE)
 
     def __str__(self):
@@ -42,7 +43,7 @@ class Usuario(models.Model):
     # correo, si está activo o no y contraseña del usuario.
     # sirve para vincular al usuario con un Token y así autenticarlo.
     user = models.OneToOneField(User, primary_key=True, on_delete=models.CASCADE, default=None)
-    foto = models.CharField(max_length=100, null=True) #cambiar por foto
+    foto = models.CharField(max_length=3100, null=True) #cambiar por foto
     id_evento = models.ForeignKey(Evento, on_delete=models.SET_NULL, null=True, blank=True)
 
     def __str__(self):
@@ -69,9 +70,12 @@ class Contactos(models.Model):
 
 class Actividades(models.Model):
     id = models.AutoField(primary_key=True)
-    descripcion = models.TextField(blank=True)
-    valor = models.FloatField()  # Considerar cambiar a DecimalField para mayor precision.
+    descripcion = models.TextField(blank=True, unique=True)
+    # Este es el valor total de la actividad
+    valor = models.DecimalField(max_digits=20, decimal_places=2)  
     id_evento = models.ForeignKey(Evento, on_delete=models.CASCADE)
+    # En este campo va el dueño de la actividad
+    id_usuario = models.ForeignKey(User, null=True, on_delete=models.CASCADE)
 
     def __str__(self):
         return self.descripcion
@@ -80,8 +84,17 @@ class ParticipantesEventoActividad(models.Model):
     id = models.AutoField(primary_key=True)
     id_actividad = models.ForeignKey(Actividades, on_delete=models.CASCADE)
     id_evento = models.ForeignKey(Evento, on_delete=models.CASCADE)
-    id_participante = models.ForeignKey(Contactos, on_delete=models.CASCADE)
-    valor_participacion = models.IntegerField()  
+    # Con este campo se sabe también quienes son contactos de un evento.
+    id_participante = models.ForeignKey(User, on_delete=models.CASCADE)
+    # Este es el valor que aporta cada participante, no debe superar el valor de la actividad,
+    # La idea es siempre mostrar el valor como número, no como porcentaje, solo se permite dar un %
+    # al creador para el aporte que dará su contacto, pero el sistema calcula automaticamente el valor
+    # númerico y lo asigna.
+    valor_participacion = models.DecimalField(max_digits=20, decimal_places=2)  
+    valor_pagado = models.DecimalField(max_digits=20, decimal_places=2, default=0.0000) 
+    # Este campo servirá para validar si el participante aceptó participar 
+    aceptado = models.BooleanField(null=False, default=False)
+    fecha_aceptacion = models.DateTimeField(null=True)
 
     def __str__(self):
         return f'{self.id_participante} - {self.id_actividad}'
