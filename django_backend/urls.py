@@ -66,6 +66,8 @@ urlpatterns = [
           views.ver_solo_actividades_todas_eventos, name="ver_solo_actividades_todas_eventos"),
      path('add/contact/event/', 
           views.agregar_contacto_evento, name="agregar_contacto_evento"),
+     path('remove/contact/event/', 
+          views.quitar_contacto_evento, name="quitar_contacto_evento"),
      path('accept/invitation/', 
           views.aceptar_invitacion, name="aceptar_invitacion"),  
      path('view/your/invitations/',
