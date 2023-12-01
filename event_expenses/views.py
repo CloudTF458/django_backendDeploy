@@ -481,19 +481,31 @@ def ver_eventos_actividades_usuario(request):
                 print("evento_actividades:", evento_actividades)
                 if len(evento_actividades) > 0:
                     for event_act in evento_actividades:
-                        evento_actividad = {
-                            "evento": event_act.id_evento.nombre,
-                            "evento_tipo": event_act.id_evento.tipo,
-                            "evento_descripcion": event_act.id_evento.descripcion,
-                            "evento_foto": event_act.id_evento.foto,
-                            "evento_creador": event_act.id_evento.id_usuario.username,
-                            "email_participante": event_act.id_participante.email,
-                            "usuario_participante": event_act.id_participante.username,
-                            "actividad": event_act.id_actividad.descripcion,
-                            "actividad_email_propietario": event_act.id_actividad.id_usuario.email,
-                            "actividad_usuario_propietario": event_act.id_actividad.id_usuario.username,
-                            "actividad_valor": round(event_act.id_actividad.valor, 2),
-                        }
+                        if event_act.id_actividad:
+                            evento_actividad = {
+                                "evento": event_act.id_evento.nombre,
+                                "evento_tipo": event_act.id_evento.tipo,
+                                "evento_descripcion": event_act.id_evento.descripcion,
+                                "evento_foto": event_act.id_evento.foto,
+                                "evento_creador": event_act.id_evento.id_usuario.username,
+                                "email_participante": event_act.id_participante.email,
+                                "usuario_participante": event_act.id_participante.username,
+                                "actividad": event_act.id_actividad.descripcion,
+                                "actividad_email_propietario": event_act.id_actividad.id_usuario.email,
+                                "actividad_usuario_propietario": event_act.id_actividad.id_usuario.username,
+                                "actividad_valor": round(event_act.id_actividad.valor, 2),
+                            }
+                        else:
+                            evento_actividad = {
+                                "evento": event_act.id_evento.nombre,
+                                "evento_tipo": event_act.id_evento.tipo,
+                                "evento_descripcion": event_act.id_evento.descripcion,
+                                "evento_foto": event_act.id_evento.foto,
+                                "evento_creador": event_act.id_evento.id_usuario.username,
+                                "email_participante": event_act.id_participante.email,
+                                "usuario_participante": event_act.id_participante.username,
+                                "actividad": "",
+                            }
                 else:
                     # En caso de que no hayan actividades asociadas al evento, se deja un string vacío
                     evento_actividad = {
@@ -517,19 +529,31 @@ def ver_eventos_actividades_usuario(request):
 
         # Ahora guardamos los eventos en los que el usuario participa.
         for evento in eventos_participante:
-            evento_actividad = {
-                "evento": evento.id_evento.nombre,
-                "evento_tipo": evento.id_evento.tipo,
-                "evento_descripcion": evento.id_evento.descripcion,
-                "evento_foto": evento.id_evento.foto,
-                "evento_creador": evento.id_evento.id_usuario.username,
-                "email_participante": evento.id_participante.email,
-                "usuario_participante": evento.id_participante.username,
-                "actividad": evento.id_actividad.descripcion,
-                "actividad_email_propietario": evento.id_actividad.id_usuario.email,
-                "actividad_usuario_propietario": evento.id_actividad.id_usuario.username,
-                "actividad_valor": round(evento.id_actividad.valor, 2),
-            }
+            if evento.id_actividad:
+                evento_actividad = {
+                    "evento": evento.id_evento.nombre,
+                    "evento_tipo": evento.id_evento.tipo,
+                    "evento_descripcion": evento.id_evento.descripcion,
+                    "evento_foto": evento.id_evento.foto,
+                    "evento_creador": evento.id_evento.id_usuario.username,
+                    "email_participante": evento.id_participante.email,
+                    "usuario_participante": evento.id_participante.username,
+                    "actividad": evento.id_actividad.descripcion,
+                    "actividad_email_propietario": evento.id_actividad.id_usuario.email,
+                    "actividad_usuario_propietario": evento.id_actividad.id_usuario.username,
+                    "actividad_valor": round(evento.id_actividad.valor, 2),
+                }
+            else:
+                evento_actividad = {
+                    "evento": evento.id_evento.nombre,
+                    "evento_tipo": evento.id_evento.tipo,
+                    "evento_descripcion": evento.id_evento.descripcion,
+                    "evento_foto": evento.id_evento.foto,
+                    "evento_creador": evento.id_evento.id_usuario.username,
+                    "email_participante": evento.id_participante.email,
+                    "usuario_participante": evento.id_participante.username,
+                    "actividad": "",
+                }
             lista_eventos_actividades.append(evento_actividad)
             
         # Se valida si el usuario participa en algún evento o creó uno.
@@ -1235,7 +1259,7 @@ def agregar_contacto_evento(request):
         except ParticipantesEventoActividad.DoesNotExist:
             print("Contact not assigned yet!")
 
-        # Asignemos el contacto a la actividad
+        # Asignemos el contacto al evento
         eventosActividades = ParticipantesEventoActividad.objects.create(
             id_actividad = None,
             id_evento = evento,
@@ -1247,6 +1271,47 @@ def agregar_contacto_evento(request):
         serializer = ParticipantesSerializer(eventosActividades, many=False)
 
         return Response({"error":False, "description": serializer.data}, status=status.HTTP_200_OK)
+
+@api_view(['POST']) # Es un decorador que me sirve para renderizar en pantalla la vista basada en función.
+@authentication_classes([TokenAuthentication]) # Me sirve para permitir autenticación por token para acceder a este método.
+@permission_classes([IsAuthenticated])
+def quitar_contacto_evento(request):
+    if request.method == 'POST':
+        # Obtenemos al usuario por medio de su token
+        try:
+            user = Token.objects.get(key=request.auth.key).user
+        except Token.DoesNotExist:
+            return Response({"error": True, "error_cause": 'User does not exist'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Validamos que el usuario sea el dueño del evento a buscar.
+        try:
+            evento = Evento.objects.get(id_usuario=user, nombre=request.data["nombre"])
+        except Evento.DoesNotExist:
+            return Response({"error": True, "error_cause": "User hasn't created this event: {event}".format(event=request.data["nombre"])}, status=status.HTTP_404_NOT_FOUND)
+
+        # Busquemos al contacto que queremos asignar
+        try:
+            contact = User.objects.get(email=request.data["email_contacto"])
+        except User.DoesNotExist:
+            return Response({"error":True, "error_cause":"Contact doesn't exist!"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Si asignamos a un contacto, validemos que efectivamente sea contacto del dueño del evento.
+        try:
+            if request.data["email_contacto"]:
+                contacto_asignar = Contactos.objects.get(usuario=user, contacto=contact)
+        except Contactos.DoesNotExist:
+            return Response({"error":True, "error_cause":"User hasn't this contact aggregated yet!"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Desvinculamos el contacto del evento
+        try:
+            eventosActividades = ParticipantesEventoActividad.objects.get(id_evento = evento, id_participante = contact, id_actividad__isnull = True)
+        except ParticipantesEventoActividad.DoesNotExist:
+            return Response({"error":True, "error_cause":"Contact isn't participant of this event yet!"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        eventosActividades.delete()
+
+        return Response({"error":False, "message":"User deleted sucessfully from activity!"}, status=status.HTTP_200_OK)
+
 
 # Esta vista es una variante de ver_saldos_pendientes, pero se usará para identificar invitaciones 
 # a eventos (id_actividad = null)
